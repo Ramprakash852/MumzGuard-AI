@@ -16,11 +16,13 @@ from src.retriever import retrieve, RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
-# Models (per user request)
-GRADING_MODEL = "liquidai/lfm2.5-1.2b-thinking:free"
+# Models (final configuration)
+
+GRADING_MODEL = "openai/gpt-oss-120b:free"
+
 REASONING_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "nvidia/nemotron-3-super:free",
+    "openai/gpt-oss-120b:free",
+    "nvidia/nemotron-3-super:free"
 ]
 
 # Prompts
@@ -95,8 +97,8 @@ def grade_chunks(
                 parsed = json.loads(raw)
                 relevant = bool(parsed.get("relevant", False))
             except Exception:
-                logger.debug("Failed to parse grading JSON, defaulting relevant=False")
-                relevant = False
+                logger.debug("Failed to parse grading JSON, defaulting relevant=True")
+                relevant = True
         except Exception as e:
             logger.warning(f"Grading API call failed for chunk {chunk.id}: {e}")
             relevant = False
