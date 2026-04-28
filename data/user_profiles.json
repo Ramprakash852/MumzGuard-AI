@@ -1,0 +1,112 @@
+[
+  {
+    "user_id": "USR-001",
+    "name": "Fatima Al Mansoori",
+    "child_age_months": 8,
+    "vehicle_model": "Toyota Corolla 2021",
+    "existing_purchases": ["CAR-001", "TOY-001", "CLO-001"],
+    "location": "Dubai",
+    "language_preference": "ar",
+    "has_allergies": [],
+    "return_history_count": 1
+  },
+  {
+    "user_id": "USR-002",
+    "name": "Omar Alqahtani",
+    "child_age_months": 14,
+    "vehicle_model": "Hyundai Tucson 2022",
+    "existing_purchases": ["STR-002", "FOR-004", "TOY-003"],
+    "location": "Riyadh",
+    "language_preference": "en",
+    "has_allergies": ["cow_milk_protein"],
+    "return_history_count": 2
+  },
+  {
+    "user_id": "USR-003",
+    "name": "Mariam Al Dhaheri",
+    "child_age_months": 3,
+    "vehicle_model": "Nissan Patrol 2020",
+    "existing_purchases": ["CAR-004", "CLO-004", "FOR-001"],
+    "location": "Abu Dhabi",
+    "language_preference": "ar",
+    "has_allergies": [],
+    "return_history_count": 0
+  },
+  {
+    "user_id": "USR-004",
+    "name": "Lina Haddad",
+    "child_age_months": 22,
+    "vehicle_model": "Kia Sportage 2023",
+    "existing_purchases": ["STR-004", "TOY-004", "CLO-005"],
+    "location": "Dubai",
+    "language_preference": "en",
+    "has_allergies": ["egg"],
+    "return_history_count": 1
+  },
+  {
+    "user_id": "USR-005",
+    "name": "Abdullah Al Harbi",
+    "child_age_months": 6,
+    "vehicle_model": "Honda Accord 2019",
+    "existing_purchases": ["CAR-002", "FOR-002", "TOY-002"],
+    "location": "Riyadh",
+    "language_preference": "ar",
+    "has_allergies": ["lactose_sensitivity"],
+    "return_history_count": 3
+  },
+  {
+    "user_id": "USR-006",
+    "name": "Noor Al Suwaidi",
+    "child_age_months": 11,
+    "vehicle_model": "Mazda CX-5 2021",
+    "existing_purchases": ["STR-001", "FOR-003", "CLO-002"],
+    "location": "Abu Dhabi",
+    "language_preference": "en",
+    "has_allergies": [],
+    "return_history_count": 0
+  },
+  {
+    "user_id": "USR-007",
+    "name": "Reem Al Otaibi",
+    "child_age_months": 19,
+    "vehicle_model": "Chevrolet Tahoe 2022",
+    "existing_purchases": ["CAR-003", "TOY-005", "CLO-003"],
+    "location": "Riyadh",
+    "language_preference": "ar",
+    "has_allergies": ["peanut"],
+    "return_history_count": 2
+  },
+  {
+    "user_id": "USR-008",
+    "name": "Yousef Al Falasi",
+    "child_age_months": 27,
+    "vehicle_model": "Ford Explorer 2020",
+    "existing_purchases": ["STR-005", "CAR-005", "TOY-003"],
+    "location": "Dubai",
+    "language_preference": "en",
+    "has_allergies": [],
+    "return_history_count": 4
+  },
+  {
+    "user_id": "USR-009",
+    "name": "Hessa Al Marri",
+    "child_age_months": 5,
+    "vehicle_model": "Mitsubishi Pajero 2018",
+    "existing_purchases": ["CAR-001", "FOR-005", "TOY-001"],
+    "location": "Abu Dhabi",
+    "language_preference": "ar",
+    "has_allergies": ["cow_milk_protein"],
+    "return_history_count": 1
+  },
+  {
+    "user_id": "USR-010",
+    "name": "Sara Al Mutairi",
+    "child_age_months": 33,
+    "vehicle_model": "Volkswagen Tiguan 2023",
+    "existing_purchases": ["STR-006", "CLO-005", "TOY-004"],
+    "location": "Dubai",
+    "language_preference": "en",
+    "has_allergies": [],
+    "return_history_count": 0
+  }
+]
