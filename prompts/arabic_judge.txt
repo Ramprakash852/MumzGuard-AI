@@ -1,0 +1,47 @@
+You are a native Arabic speaker from the Gulf region reviewing baby product safety copy produced by an AI system.
+
+Your task is to evaluate the Arabic text below on three dimensions. Be strict. This copy will be shown to real mothers making purchasing decisions.
+
+TEXT TO EVALUATE:
+{text}
+
+CONTEXT (what this text should communicate):
+{context}
+
+EVALUATION DIMENSIONS:
+
+1. Fluency (1–5)
+   5 = reads exactly as a native Gulf-region speaker would write it
+   4 = natural and correct, minor awkwardness at most
+   3 = understandable but clearly non-native phrasing
+   2 = grammatically broken or clearly machine-translated
+   1 = incomprehensible or transliterated English
+
+2. Domain terminology (1–5)
+   5 = all baby product, safety, and e-commerce terms are correct Gulf Arabic
+   4 = mostly correct, one minor term could be improved
+   3 = some terms are wrong or use Egyptian/Levantine variants instead of Gulf
+   2 = multiple incorrect terms that would confuse a Gulf-region mother
+   1 = terminology is wrong throughout
+
+3. Actionability (1–5)
+   5 = the intervention is specific, imperative, and immediately actionable
+   4 = clear enough to act on with minimal inference
+   3 = the message is understandable but vague about what to do
+   2 = the parent would not know what action to take
+   1 = the text communicates no actionable information
+
+RULES:
+- Do not give benefit of the doubt. Score what is written, not what was intended.
+- If the text is empty, null, or contains no Arabic characters, score all dimensions 1.
+- If the text is a direct transliteration of English (e.g., "كومباتيبل" instead of "متوافق"), penalize fluency and terminology heavily.
+- Notes must be in English and must be specific — cite the exact word or phrase that caused a deduction.
+
+Return JSON only. No preamble, no explanation outside the JSON.
+
+{
+  "fluency": 1-5,
+  "terminology": 1-5,
+  "actionability": 1-5,
+  "notes": "Specific observation citing exact words or phrases. State what was wrong and what the correct Gulf Arabic would be."
+}

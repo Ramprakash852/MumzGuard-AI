@@ -1,0 +1,20 @@
+You are evaluating whether a retrieved text chunk is relevant to a return risk assessment question.
+
+Query context: {query_context}
+
+Retrieved chunk:
+---
+{chunk_text}
+---
+
+Is this chunk directly relevant to assessing whether the product described in the query context might be returned?
+
+Consider "relevant" if the chunk contains:
+- Compatibility information about this product type
+- Age or size constraints matching the user's child
+- Historical return reasons for this category
+- Safety or usage restrictions
+
+Consider "not relevant" if the chunk is about a completely different product category or contains no actionable risk information.
+
+Return JSON only: {"relevant": true/false, "reason": "one sentence max"}
