@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 from pathlib import Path
 from datetime import datetime
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
@@ -20,13 +22,21 @@ logger = logging.getLogger(__name__)
 openrouter_client: Optional[OpenAI] = None
 
 
+def _load_openrouter_api_key() -> str:
+    load_dotenv()
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY is missing or empty")
+    return api_key
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global openrouter_client
     # ✅ CHANGED: initialize OpenRouter only; Anthropic removed completely
     openrouter_client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
-        api_key=Path(".env").read_text().split("OPENROUTER_API_KEY=")[1].split("\n")[0]
+        api_key=_load_openrouter_api_key()
     )
     logger.info("Clients initialized")
     yield
@@ -94,7 +104,8 @@ async def list_products():
     """Returns the product catalog for the frontend to display."""
     import json
     from pathlib import Path
-    products = json.loads(Path("data/catalog.json").read_text())
+    # ✅ CHANGED: force UTF-8 so Arabic product titles load on Windows
+    products = json.loads(Path("data/catalog.json").read_text(encoding="utf-8"))
     return {"products": products, "count": len(products)}
 
 
@@ -102,7 +113,8 @@ async def list_products():
 async def get_product(product_id: str):
     import json
     from pathlib import Path
-    products = json.loads(Path("data/catalog.json").read_text())
+    # ✅ CHANGED: force UTF-8 so Arabic product titles load on Windows
+    products = json.loads(Path("data/catalog.json").read_text(encoding="utf-8"))
     product = next((p for p in products if p["product_id"] == product_id), None)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")

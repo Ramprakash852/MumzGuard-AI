@@ -2,146 +2,176 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
-from openai import OpenAI  # OpenRouter uses OpenAI-compatible client
+from openai import OpenAI
 
-from src.schema import QueryContext, ReturnRiskOutput, ValidationFailure, RiskLevel
-from src.retriever import retrieve, RetrievalResult, RetrievedChunk
+from src.schema import (
+    QueryContext,
+    ReturnRiskOutput,
+    ValidationFailure,
+    RiskLevel,
+)
+from src.retriever import retrieve, RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
-# Load prompts from files
-SYSTEM_PROMPT = Path("prompts/system_reasoning.txt").read_text()
-GRADING_PROMPT_TEMPLATE = Path("prompts/grading.txt").read_text()
+# Models (per user request)
+GRADING_MODEL = "liquidai/lfm2.5-1.2b-thinking:free"
+REASONING_MODELS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "nvidia/nemotron-3-super:free",
+]
 
-# Confidence ceiling when context is thin
+# Prompts
+SYSTEM_PROMPT = Path("prompts/system_reasoning.txt").read_text() if Path("prompts/system_reasoning.txt").exists() else ""
+
+# Confidence cap when context is thin
 THIN_CONTEXT_CONFIDENCE_CAP = 0.6
 
 
+def _clean_llm_output(raw: str) -> str:
+    if not isinstance(raw, str):
+        raw = str(raw)
+    return raw.replace("```json", "").replace("```", "").strip()
+
+
+def _get_status_code_from_exc(exc: Exception) -> Optional[int]:
+    # Best-effort extraction of HTTP-like status codes from exceptions
+    for attr in ("http_status", "status_code", "status"):
+        code = getattr(exc, attr, None)
+        if isinstance(code, int):
+            return code
+
+    # Fallback: try to find numeric codes in the string
+    try:
+        s = str(exc)
+        for token in ("429", "504", "404"):
+            if token in s:
+                return int(token)
+    except Exception:
+        pass
+    return None
+
+
 def grade_chunks(
-    chunks: list[RetrievedChunk],
-    query_context: QueryContext,
-    openrouter_client: OpenAI,
-) -> list[RetrievedChunk]:
+    chunks: List[RetrievedChunk],
+    context: QueryContext,
+    client: OpenAI,
+) -> List[RetrievedChunk]:
     """
-    Use a fast/cheap model to filter irrelevant chunks before the main call.
-    Returns only chunks graded as relevant.
+    Use a fast classifier model to keep only relevant chunks.
+    If parsing fails for a chunk, default to relevant=False.
     """
-    relevant_chunks = []
-    
-    query_summary = (
-        f"Category: {query_context.category}, "
-        f"Child age: {query_context.child_age_months} months, "
-        f"Vehicle: {query_context.vehicle_model or 'not specified'}"
+    kept: List[RetrievedChunk] = []
+
+    prompt_template = (
+        "You are a strict relevance classifier.\n"
+        "Return ONLY JSON in the exact format: {\"relevant\": true|false}.\n"
+        "No explanation, no extra keys, no markdown.\n"
+        "Input: {context_summary}\n"
+        "Chunk: {chunk_text}\n"
     )
-    
+
+    context_summary = (
+        f"product_id={context.product_id}; category={context.category}; "
+        f"child_age_months={context.child_age_months}; vehicle={context.vehicle_model or 'N/A'}"
+    )
+
     for chunk in chunks:
-        prompt = GRADING_PROMPT_TEMPLATE.format(
-            query_context=query_summary,
-            chunk_text=chunk.text
+        prompt = prompt_template.replace("{context_summary}", context_summary).replace(
+            "{chunk_text}", chunk.text
         )
-        
+
         try:
-            # ✅ CHANGED: use OpenRouter client for grading call
-            response = openrouter_client.chat.completions.create(
-                model="meta-llama/llama-3.1-8b-instruct:free",
+            resp = client.chat.completions.create(
+                model=GRADING_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=100
+                max_tokens=32,
             )
-            raw = response.choices[0].message.content.strip()
-            # Strip markdown backticks if present
-            raw = raw.replace("```json", "").replace("```", "").strip()
-            result = json.loads(raw)
-            if result.get("relevant"):
-                relevant_chunks.append(chunk)
+            raw = _clean_llm_output(resp.choices[0].message.content)
+            try:
+                parsed = json.loads(raw)
+                relevant = bool(parsed.get("relevant", False))
+            except Exception:
+                logger.debug("Failed to parse grading JSON, defaulting relevant=False")
+                relevant = False
         except Exception as e:
-            # On grading failure, keep the chunk (false negative is better than false positive drop)
-            logger.warning(f"Grading failed for chunk {chunk.id}: {e}")
-            relevant_chunks.append(chunk)
-    
-    return relevant_chunks
+            logger.warning(f"Grading API call failed for chunk {chunk.id}: {e}")
+            relevant = False
+
+        if relevant:
+            kept.append(chunk)
+
+    return kept
 
 
-def format_chunks_for_prompt(chunks: list[RetrievedChunk]) -> str:
+def format_chunks_for_prompt(chunks: List[RetrievedChunk]) -> str:
+    pieces = []
+    for i, c in enumerate(chunks, start=1):
+        pieces.append(f"[SRC {i} | {c.source} | sim={c.similarity:.3f}]\n{c.text}")
+    return "\n\n---\n\n".join(pieces)
+
+
+def call_llm_with_fallback(client: OpenAI, messages: List[dict]) -> Tuple[Optional[str], Optional[dict]]:
     """
-    Format retrieved chunks into a clean context block for the LLM.
+    Try each model in REASONING_MODELS with the prescribed retry/backoff policy.
+
+    Returns (raw_text, metadata) on success or (None, error_obj) on total failure.
     """
-    formatted = []
-    for i, chunk in enumerate(chunks):
-        formatted.append(
-            f"[SOURCE {i+1}: {chunk.id} | {chunk.source} | sim={chunk.similarity}]\n{chunk.text}"
-        )
-    return "\n\n---\n\n".join(formatted)
+    backoffs = [2, 4, 6]
 
+    for model in REASONING_MODELS:
+        logger.debug(f"Trying reasoning model: {model}")
+        for attempt in range(1, 4):
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.0,
+                    max_tokens=1024,
+                )
+                raw = resp.choices[0].message.content
+                raw = _clean_llm_output(raw)
+                return raw, {"model": model}
 
-def call_reasoning_llm(
-    context: QueryContext,
-    chunks: list[RetrievedChunk],
-    openrouter_client: OpenAI,  # ✅ CHANGED: use OpenRouter client
-    confidence_cap: Optional[float] = None,
-) -> dict:
-    """
-    Main LLM call. Returns raw dict from LLM (not yet validated by Pydantic).
-    Uses OpenRouter (OpenAI-compatible) client only.
-    """
-    user_prompt = f"""
-Product being assessed: {context.product_id}
-Title (EN): {context.product_title_en}
-Title (AR): {context.product_title_ar or 'not available'}
-Category: {context.category}
-Brand: {context.brand or 'not specified'}
-Child age: {context.child_age_months or 'not specified'} months
-Vehicle: {context.vehicle_model or 'not specified'}
-Cart also contains: {', '.join(context.cart_contents) if context.cart_contents else 'nothing else'}
-Known allergies: {', '.join(context.has_allergies) if context.has_allergies else 'none recorded'}
-User language preference: {context.language_preference}
+            except Exception as e:
+                code = _get_status_code_from_exc(e)
+                logger.warning(f"Model {model} attempt {attempt} failed (code={code}): {e}")
 
-RETRIEVED CONTEXT:
-{format_chunks_for_prompt(chunks)}
+                # Immediate model-skip rules
+                if code in (429, 404, 504):
+                    logger.info(f"Skipping model {model} due to status {code}")
+                    break  # go to next model
 
-Assess return risk and return JSON.
-{"NOTE: Context is limited. Cap your confidence at " + str(confidence_cap) + " maximum." if confidence_cap else ""}
-    """.strip()
+                # Retry with backoff for other errors
+                if attempt < 3:
+                    sleep_for = backoffs[attempt - 1]
+                    logger.debug(f"Retrying model {model} after {sleep_for}s")
+                    time.sleep(sleep_for)
+                    continue
+                else:
+                    logger.info(f"Exhausted retries for model {model}, moving to next model")
+                    break
 
-    # ✅ CHANGED: call OpenRouter via openrouter_client
-    response = openrouter_client.chat.completions.create(
-        model="meta-llama/llama-3.3-70b-instruct:free",
-        messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT + "\nReturn strictly valid JSON. No explanation. No markdown."
-            },
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.1,
-        max_tokens=1000
-    )
-
-    raw_text = response.choices[0].message.content.strip()
-    # ✅ CHANGED: JSON cleaning for backticks
-    if raw_text.startswith("```"):
-        raw_text = raw_text.replace("```json", "").replace("```", "").strip()
-
-    return json.loads(raw_text), raw_text
+    return None, {"error": "llm_unavailable", "message": "All models failed"}
 
 
 def analyze_return_risk(
     context: QueryContext,
-    openrouter_client: OpenAI,  # ✅ CHANGED: remove anthropic client, use openrouter only
-) -> tuple[Optional[ReturnRiskOutput], Optional[ValidationFailure]]:
+    client: OpenAI,
+) -> Tuple[Optional[ReturnRiskOutput], Optional[ValidationFailure]]:
     """
-    Full pipeline: retrieve → grade → reason → validate.
-    Returns (output, None) on success or (None, failure) on failure.
+    Full pipeline: retrieve → grade → reason (with fallback) → validate.
+
+    Returns (ReturnRiskOutput, None) on success or (None, ValidationFailure) on failure.
     """
-    
-    # Stage 1: Retrieve
+    # 1) Retrieve
     retrieval = retrieve(context)
-    
+
     if retrieval.status == "INSUFFICIENT_DATA":
-        # No relevant context — return a well-formed INSUFFICIENT_DATA response
-        output = ReturnRiskOutput(
+        out = ReturnRiskOutput(
             product_id=context.product_id,
             risk_level=RiskLevel.INSUFFICIENT_DATA,
             risk_score=0.0,
@@ -152,121 +182,116 @@ def analyze_return_risk(
             confidence=0.0,
             evidence_sources=[],
             refuses_if_no_data=True,
-            language=context.language_preference
+            language=context.language_preference,
         )
-        return output, None
-    
-    # Stage 2: Grade chunks
-    relevant_chunks = grade_chunks(retrieval.chunks, context, openrouter_client)
-    
+        return out, None
+
+    # 2) Grade
+    relevant_chunks = grade_chunks(retrieval.chunks, context, client)
+
     if not relevant_chunks:
-        # Grading removed everything — treat as insufficient
-        output = ReturnRiskOutput(
+        out = ReturnRiskOutput(
             product_id=context.product_id,
             risk_level=RiskLevel.INSUFFICIENT_DATA,
             risk_score=0.0,
-            risk_reason_en="Retrieved context was not relevant to this specific product and user context.",
+            risk_reason_en="Retrieved context was not relevant to this product and user context.",
             risk_reason_ar="لم يكن السياق المسترجع ذا صلة بهذا المنتج وسياق المستخدم.",
             intervention_en=None,
             intervention_ar=None,
             confidence=0.0,
             evidence_sources=[],
             refuses_if_no_data=True,
-            language=context.language_preference
+            language=context.language_preference,
         )
-        return output, None
-    
-    # Determine confidence cap based on context richness
+        return out, None
+
+    # confidence cap
     confidence_cap = None
     if len(relevant_chunks) <= 2:
         confidence_cap = THIN_CONTEXT_CONFIDENCE_CAP
-    
-    # Stage 3: Reason
-    try:
-        raw_dict, raw_text = call_reasoning_llm(
-            context, relevant_chunks, openrouter_client, confidence_cap
-        )
-    except json.JSONDecodeError as e:
-        failure = ValidationFailure(
+
+    # 3) Reasoning: build messages
+    system = SYSTEM_PROMPT + "\nReturn strictly valid JSON. No explanation. No markdown."
+    user_text = (
+        f"Product: {context.product_id}\n"
+        f"Title EN: {context.product_title_en}\n"
+        f"Title AR: {context.product_title_ar or 'N/A'}\n"
+        f"Category: {context.category}\n"
+        f"Brand: {context.brand or 'N/A'}\n"
+        f"Child age months: {context.child_age_months or 'N/A'}\n"
+        f"Vehicle: {context.vehicle_model or 'N/A'}\n"
+        f"Cart: {', '.join(context.cart_contents) if context.cart_contents else 'none'}\n"
+        f"Allergies: {', '.join(context.has_allergies) if context.has_allergies else 'none'}\n\n"
+        f"RETRIEVED:\n{format_chunks_for_prompt(relevant_chunks)}\n\n"
+        f"ASSESS return risk and return strictly valid JSON."
+    )
+
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_text},
+    ]
+
+    raw, meta = call_llm_with_fallback(client, messages)
+    if raw is None:
+        # All models failed — return fail-safe error as ValidationFailure for upstream logging
+        vf = ValidationFailure(
             product_id=context.product_id,
-            error_type="json_parse_error",
-            error_detail=str(e),
-            raw_llm_output="(non-JSON response)"
+            error_type="llm_unavailable",
+            error_detail=meta.get("message", "All models failed"),
+            raw_llm_output="",
         )
-        return None, failure
-    
-    # Stage 4: Validate
-    raw_dict["product_id"] = context.product_id
-    raw_dict["language"] = context.language_preference
-    
+        return None, vf
+
+    # 4) Clean
+    cleaned = _clean_llm_output(raw)
+
+    # 5) Validate JSON (retry once on parse failure)
+    parsed = None
     try:
-        output = ReturnRiskOutput(**raw_dict)
-        # Apply confidence cap post-validation
+        parsed = json.loads(cleaned)
+    except Exception as e:
+        logger.warning(f"Initial JSON parse failed: {e}; retrying once")
+        # Retry once: ask the LLM to return strictly JSON only
+        retry_messages = messages + [
+            {"role": "system", "content": "Return strictly valid JSON only. No explanation."}
+        ]
+        raw2, meta2 = call_llm_with_fallback(client, retry_messages)
+        if raw2 is None:
+            vf = ValidationFailure(
+                product_id=context.product_id,
+                error_type="llm_unavailable",
+                error_detail=meta2.get("message", "All models failed on retry"),
+                raw_llm_output="",
+            )
+            return None, vf
+
+        cleaned2 = _clean_llm_output(raw2)
+        try:
+            parsed = json.loads(cleaned2)
+        except Exception as e2:
+            vf = ValidationFailure(
+                product_id=context.product_id,
+                error_type="json_parse_error",
+                error_detail=str(e2),
+                raw_llm_output=cleaned2,
+            )
+            return None, vf
+
+    # 6) Normalize & validate with Pydantic
+    parsed["product_id"] = context.product_id
+    parsed["language"] = context.language_preference
+
+    try:
+        output = ReturnRiskOutput(**parsed)
+        # Apply confidence cap if needed
         if confidence_cap and output.confidence > confidence_cap:
             output = output.model_copy(update={"confidence": confidence_cap})
         return output, None
     except Exception as e:
-        failure = ValidationFailure(
+        vf = ValidationFailure(
             product_id=context.product_id,
             error_type="schema_validation_error",
             error_detail=str(e),
-            raw_llm_output=json.dumps(raw_dict)
+            raw_llm_output=json.dumps(parsed),
         )
-        # Retry once with error context using OpenRouter
-        return _retry_with_error(context, relevant_chunks, raw_dict, str(e), 
-                      openrouter_client, confidence_cap)
-
-
-def _retry_with_error(
-    context: QueryContext,
-    chunks: list[RetrievedChunk],
-    failed_dict: dict,
-    error_msg: str,
-    openrouter_client: OpenAI,  # ✅ CHANGED: use OpenRouter client
-    confidence_cap: Optional[float]
-) -> tuple[Optional[ReturnRiskOutput], Optional[ValidationFailure]]:
-    """
-    Self-correcting retry: append the validation error to the prompt.
-    This catches ~80% of transient formatting failures.
-    """
-    correction_prompt = f"""
-Your previous response failed validation with this error:
-{error_msg}
-
-Your previous response was:
-{json.dumps(failed_dict, indent=2)}
-
-Please fix the issue and return corrected JSON only.
-    """
-    
-    try:
-        # ✅ CHANGED: retry via OpenRouter with the instructed model
-        response = openrouter_client.chat.completions.create(
-            model="meta-llama/llama-3.3-70b-instruct:free",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT + "\nReturn strictly valid JSON. No explanation. No markdown."},
-                {"role": "user", "content": format_chunks_for_prompt(chunks)},
-                {"role": "user", "content": json.dumps(failed_dict)},
-                {"role": "user", "content": correction_prompt}
-            ],
-            temperature=0.1,
-            max_tokens=1000
-        )
-
-        raw_text = response.choices[0].message.content.strip()
-        # ✅ CHANGED: JSON cleaning for backticks
-        if raw_text.startswith("```"):
-            raw_text = raw_text.replace("```json", "").replace("```", "").strip()
-
-        corrected = json.loads(raw_text)
-        corrected["product_id"] = context.product_id
-        output = ReturnRiskOutput(**corrected)
-        return output, None
-    except Exception as e:
-        failure = ValidationFailure(
-            product_id=context.product_id,
-            error_type="retry_failed",
-            error_detail=str(e),
-            raw_llm_output=str(failed_dict)
-        )
-        return None, failure
+        return None, vf
