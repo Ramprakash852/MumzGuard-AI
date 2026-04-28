@@ -3,7 +3,9 @@ import streamlit as st
 import requests
 import json
 
-API_URL = "http://localhost:8000"
+API_URL = "http://127.0.0.1:8000"
+PRODUCTS_TIMEOUT_SECONDS = 10
+ANALYZE_TIMEOUT_SECONDS = 180
 
 st.set_page_config(
     page_title="MumzGuard — Return Risk Intelligence",
@@ -21,7 +23,7 @@ st.sidebar.header("Product Configuration")
 @st.cache_data(ttl=60)
 def load_products():
     try:
-        r = requests.get(f"{API_URL}/products")
+        r = requests.get(f"{API_URL}/products", timeout=PRODUCTS_TIMEOUT_SECONDS)
         return r.json()["products"]
     except Exception:
         return []
@@ -68,13 +70,23 @@ with col1:
             }
             
             try:
-                response = requests.post(f"{API_URL}/analyze", json=payload, timeout=30)
+                response = requests.post(
+                    f"{API_URL}/analyze",
+                    json=payload,
+                    timeout=ANALYZE_TIMEOUT_SECONDS,
+                )
                 if response.status_code == 200:
                     st.session_state["result"] = response.json()
                     st.session_state["error"] = None
                 else:
                     st.session_state["error"] = response.json()
                     st.session_state["result"] = None
+            except requests.exceptions.ReadTimeout:
+                st.session_state["error"] = (
+                    f"Request timed out after {ANALYZE_TIMEOUT_SECONDS}s. "
+                    "The backend is still processing the analysis; try again in a moment."
+                )
+                st.session_state["result"] = None
             except Exception as e:
                 st.session_state["error"] = str(e)
                 st.session_state["result"] = None
