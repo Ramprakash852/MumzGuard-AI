@@ -1,0 +1,19 @@
+# Core API framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+
+# RAG stack (vector DB + multilingual embeddings)
+chromadb==0.5.23
+sentence-transformers==3.4.1
+
+# LLM client (OpenRouter via OpenAI-compatible API)
+openai==1.76.2
+
+# UI
+streamlit==1.44.1
+
+# Validation, testing, config, logging
+pydantic==2.11.4
+pytest==8.3.5
+python-dotenv==1.1.0
+rich==13.9.4

@@ -1,0 +1,42 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# Project-specific
+*.pt
+*.pth
+*.onnx
+chat_data.json
+emotion_data.json
+mood_chart.png
+wellness_report.pdf
+temp_speech.mp3
+
+# Dataset & Large Files
+archive/
+runs/
+*.zip
+
+# Cache
+.cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Streamlit
+.streamlit/
+.streamlit_session/
