@@ -12,7 +12,7 @@ MumzGuard is an AI-powered return risk intelligence system designed for Mumzworl
 
 ---
 
-# ⚙️ 2. Setup & Run (UNDER 5 MINUTES)
+# ⚙️ 2. Setup & Run
 
 1. Clone repository
 
@@ -71,6 +71,8 @@ streamlit run frontend/app.py
 
 # 🏗️ 3. System Architecture
 
+![Architecture](./Public/Architecture.png)
+
 MumzGuard uses a staged, fail-safe architecture:
 
 - Retriever (ChromaDB + multilingual embeddings):
@@ -89,7 +91,7 @@ MumzGuard uses a staged, fail-safe architecture:
 - Frontend display:
   - Streamlit UI shows risk level, score, confidence, reasons (EN/AR), intervention, and evidence sources.
 
-Simple flow:
+System flow:
 
 User → Retriever → Grading → Reasoning → Output
 
@@ -132,7 +134,7 @@ What did not work well:
 
 ---
 
-# 🧪 5. Evals (IMPORTANT)
+# 🧪 5. Evals (Results)
 
 Evaluation rubric (10 points per case):
 
@@ -366,20 +368,7 @@ This keeps the model output transparent and auditable, rather than a black-box s
 
 ---
 
-# ⏱️ 12. Time Log (REQUIRED)
-
-- 1.0h: Problem framing, scope definition, and architecture design
-- 1.5h: Data shaping and ChromaDB indexing pipeline
-- 1.5h: Backend pipeline (retrieve → grade → reason → validate)
-- 1.0h: Streamlit frontend and API integration
-- 1.0h: Evaluation harness + adversarial tests
-- 0.5h: Debugging, schema hardening, and fallback policy tuning
-
-Total: 6.5 hours
-
----
-
-# 🧠 13. AI Usage Note (REQUIRED)
+# 🧠 12. AI Usage Note
 
 ## Where did I use AI
 
@@ -408,3 +397,16 @@ AI was used selectively, primarily to validate design decisions and accelerate i
 - Model suggestions that were unstable or unavailable (invalid OpenRouter models) were replaced with working alternatives.
 - Grading logic that defaulted to rejecting all chunks was modified to avoid pipeline collapse.
 - Suggestions that treated this as a pure LLM problem were adjusted to reinforce structured constraints and rule-guided reasoning.
+
+# ⏱️ 13. Time Log
+
+- 1.0h: Problem framing, scope definition, and architecture design
+- 1.5h: Data shaping and ChromaDB indexing pipeline
+- 1.5h: Backend pipeline (retrieve → grade → reason → validate)
+- 1.0h: Streamlit frontend and API integration
+- 1.0h: Evaluation harness + adversarial tests
+- 0.5h: Debugging, schema hardening, and fallback policy tuning
+
+Total: 6.5 hours
+
+---
