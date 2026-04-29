@@ -4,10 +4,6 @@ MumzGuard is an AI-powered return risk intelligence system designed for Mumzworl
 
 ---
 
-- **Track:** A (AI Engineering Intern)
-- **Candidate:** Ramprakash
-- **Submission Date:** April 29, 2026
-
 ## 🎬 Quick Start
 
 - **📹 3-minute video walkthrough:** [Watch on Loom](https://loom.com/share/your-loom-link-here)
