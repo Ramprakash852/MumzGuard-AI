@@ -1,6 +1,14 @@
-# 🧠 1. One-paragraph Summary
+# 🛡️ MumzGuard – AI Return Risk Intelligence System
 
-MumzGuard is a pre-checkout Return Risk Intelligence System for Mumzworld that predicts whether a baby product is likely to be returned before a mother completes purchase, using retrieval-augmented generation (RAG), relevance grading, and validated structured outputs in English and Arabic. It is built for real shopping decisions by Mumzworld mothers, where fit, compatibility, allergy, and age-suitability mistakes are costly and stressful; by surfacing risk level, grounded reasons, and intervention guidance early, the system helps reduce avoidable returns while improving customer confidence and safety.
+MumzGuard is an AI-powered return risk intelligence system designed for Mumzworld to help mothers make safer, more informed purchase decisions before checkout. It analyzes product details alongside user context (such as child age, allergies, and vehicle compatibility) using a retrieval-augmented pipeline and large language models to predict the likelihood of returns. The system generates structured, multilingual (English and Arabic) outputs including risk level, reasoning, and actionable interventions, enabling a more personalized and trustworthy shopping experience while reducing operational costs from returns.
+
+---
+
+## 🎬 Quick Start
+
+- **📹 3-minute video walkthrough:** [Watch on Loom](https://loom.com/share/your-loom-link-here)
+- **📊 Evaluation report:** [EVALS.md](./evals.md) — 12 test cases, 79.2% pass rate, detailed failure analysis
+- **⚖️ Architecture & tradeoffs:** [TRADEOFFS.md](./TRADEOFFS.md) — why RAG, why these models, what was cut
 
 ---
 
