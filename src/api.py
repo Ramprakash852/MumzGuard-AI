@@ -33,7 +33,6 @@ def _load_openrouter_api_key() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global openrouter_client
-    # ✅ CHANGED: initialize OpenRouter only; Anthropic removed completely
     openrouter_client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=_load_openrouter_api_key()
@@ -84,7 +83,6 @@ async def health():
 async def analyze(request: RiskRequest):
     context = QueryContext(**request.model_dump())
     
-    # ✅ CHANGED: OpenRouter-only analysis call
     output, failure = analyze_return_risk(context, openrouter_client)
     
     if failure:
@@ -104,7 +102,6 @@ async def list_products():
     """Returns the product catalog for the frontend to display."""
     import json
     from pathlib import Path
-    # ✅ CHANGED: force UTF-8 so Arabic product titles load on Windows
     products = json.loads(Path("data/catalog.json").read_text(encoding="utf-8"))
     return {"products": products, "count": len(products)}
 
@@ -113,7 +110,6 @@ async def list_products():
 async def get_product(product_id: str):
     import json
     from pathlib import Path
-    # ✅ CHANGED: force UTF-8 so Arabic product titles load on Windows
     products = json.loads(Path("data/catalog.json").read_text(encoding="utf-8"))
     product = next((p for p in products if p["product_id"] == product_id), None)
     if not product:

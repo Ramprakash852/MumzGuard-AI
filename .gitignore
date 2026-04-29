@@ -15,16 +15,6 @@ __pycache__/
 *.swn
 .DS_Store
 
-# Project-specific
-*.pt
-*.pth
-*.onnx
-chat_data.json
-emotion_data.json
-mood_chart.png
-wellness_report.pdf
-temp_speech.mp3
-
 # Dataset & Large Files
 archive/
 runs/
@@ -36,10 +26,4 @@ runs/
 *.egg-info/
 dist/
 build/
-
-# Streamlit
-.streamlit/
-.streamlit_session/
-
-
 .env
