@@ -6,7 +6,7 @@ MumzGuard is an AI-powered return risk intelligence system designed for Mumzworl
 
 ## 🎬 Quick Start
 
-- **📹 3-minute video walkthrough:** [Watch on Loom](https://loom.com/share/your-loom-link-here)
+- **📹 3-minute video walkthrough:** [Watch on Loom](https://www.loom.com/share/f9f3b3e71df841b0851077d33761b2e7)
 - **📊 Evaluation report:** [EVALS.md](./evals.md) — 12 test cases, 79.2% pass rate, detailed failure analysis
 - **⚖️ Architecture & tradeoffs:** [TRADEOFFS.md](./TRADEOFFS.md) — why RAG, why these models, what was cut
 
